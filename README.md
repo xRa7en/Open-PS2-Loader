@@ -50,6 +50,7 @@ For an updated compatibility list, you can visit the OPL-CL site at:\
 	<summary> <b> Supported Gamepads </b></summary>
 	<p>
 		F710 (W.I.P.)
+		XBox One Controller 1697 (Soon)
 	</p>
 </details>
 
