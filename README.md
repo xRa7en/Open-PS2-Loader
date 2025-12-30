@@ -47,6 +47,13 @@ For an updated compatibility list, you can visit the OPL-CL site at:\
 <http://sx.sytes.net/oplcl/games.aspx>
 
 <details>
+	<summary> <b> Supported Gamepads </b></summary>
+	<p>
+		F710 (W.I.P.)
+	</p>
+</details>
+
+<details>
   <summary> <b> Release types </b> </summary>
 <p>
 
