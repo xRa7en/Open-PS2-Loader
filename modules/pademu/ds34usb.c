@@ -90,6 +90,9 @@ int usb_probe(int devId)
     if (device->idVendor == DS34_VID && (device->idProduct == DS3_PID || device->idProduct == DS4_PID || device->idProduct == DS4_PID_SLIM))
         return 1;
 
+    if (device->idVendor == F710_DINPUT_VID && device->idProduct == F710_DINPUT_PID)
+        return 1;
+
     return 0;
 }
 
@@ -134,6 +137,9 @@ int usb_connect(int devId)
     } else if (device->idProduct == ROCK_BAND_PS3_PID) {
         ds34pad[pad].type = GUITAR_RB;
         epCount = interface->bNumEndpoints - 1;
+    } else if (device->idVendor == F710_DINPUT_VID && device->idProduct == F710_DINPUT_PID) {
+        ds34pad[pad].type = F710;
+        epCount = interface->bNumEndpoints;
     } else {
         ds34pad[pad].type = DS4;
         epCount = 20; // ds4 v2 returns interface->bNumEndpoints as 0
@@ -320,6 +326,13 @@ static void readReport(u8 *data, int pad_idx)
             else
                 pad->oldled[3] = 0;
 
+        } else if (pad->type == F710) {
+            struct f710report *report;
+
+            report = (struct f710report *)data;
+            translate_pad_f710(report, &pad->ds2);
+            padMacroPerform(&pad->ds2, 0);
+            pad->analog_btn = 1;
         } else if (pad->type == DS4) {
             struct ds4report *report;
             report = (struct ds4report *)data;
@@ -441,6 +454,11 @@ static void TransferWait(int sema)
 void ds34usb_set_rumble(u8 lrum, u8 rrum, int port)
 {
     WaitSema(ds34pad[port].sema);
+
+    if (ds34pad[port].type == F710) {
+        SignalSema(ds34pad[port].sema);
+        return;
+    }
 
     ds34pad[port].update_rum = 1;
     ds34pad[port].lrum = lrum;

@@ -142,3 +142,76 @@ void translate_pad_ds4(const struct ds4report *in, struct ds2report *out, u8 hav
     out->PressureL2 = in->PressureL2;
     out->PressureR2 = in->PressureR2;
 }
+
+void translate_pad_f710(const struct f710report *in, struct ds2report *out)
+{
+    static const u8 dpad_mapping[] = {
+        (DS2ButtonUp),
+        (DS2ButtonUp | DS2ButtonRight),
+        (DS2ButtonRight),
+        (DS2ButtonDown | DS2ButtonRight),
+        (DS2ButtonDown),
+        (DS2ButtonDown | DS2ButtonLeft),
+        (DS2ButtonLeft),
+        (DS2ButtonUp | DS2ButtonLeft),
+        0,
+    };
+
+    u8 dpad = in->DpadButtons & 0x0F;
+    u8 face = (in->DpadButtons >> 4) & 0x0F;
+    u8 buttons = in->Buttons;
+    u16 pressed = 0;
+
+    if (dpad > DS4DpadDirectionReleased)
+        dpad = DS4DpadDirectionReleased;
+
+    pressed |= dpad_mapping[dpad];
+
+    if (face & 0x01)
+        pressed |= DS2ButtonSquare; // X
+    if (face & 0x02)
+        pressed |= DS2ButtonCross; // A
+    if (face & 0x04)
+        pressed |= DS2ButtonCircle; // B
+    if (face & 0x08)
+        pressed |= DS2ButtonTriangle; // Y
+
+    if (buttons & 0x01)
+        pressed |= DS2ButtonL1;
+    if (buttons & 0x02)
+        pressed |= DS2ButtonR1;
+    if (buttons & 0x04)
+        pressed |= DS2ButtonL2;
+    if (buttons & 0x08)
+        pressed |= DS2ButtonR2;
+    if (buttons & 0x10)
+        pressed |= DS2ButtonSelect;
+    if (buttons & 0x20)
+        pressed |= DS2ButtonStart;
+    if (buttons & 0x40)
+        pressed |= DS2ButtonL3;
+    if (buttons & 0x80)
+        pressed |= DS2ButtonR3;
+
+    out->nButtonState = ~pressed;
+
+    out->RightStickX = in->RightStickX;
+    out->RightStickY = in->RightStickY;
+    out->LeftStickX = in->LeftStickX;
+    out->LeftStickY = in->LeftStickY;
+
+    out->PressureRight = (pressed & DS2ButtonRight) ? 255 : 0;
+    out->PressureLeft = (pressed & DS2ButtonLeft) ? 255 : 0;
+    out->PressureUp = (pressed & DS2ButtonUp) ? 255 : 0;
+    out->PressureDown = (pressed & DS2ButtonDown) ? 255 : 0;
+
+    out->PressureTriangle = (pressed & DS2ButtonTriangle) ? 255 : 0;
+    out->PressureCircle = (pressed & DS2ButtonCircle) ? 255 : 0;
+    out->PressureCross = (pressed & DS2ButtonCross) ? 255 : 0;
+    out->PressureSquare = (pressed & DS2ButtonSquare) ? 255 : 0;
+
+    out->PressureL1 = (pressed & DS2ButtonL1) ? 255 : 0;
+    out->PressureR1 = (pressed & DS2ButtonR1) ? 255 : 0;
+    out->PressureL2 = (pressed & DS2ButtonL2) ? 255 : 0;
+    out->PressureR2 = (pressed & DS2ButtonR2) ? 255 : 0;
+}
