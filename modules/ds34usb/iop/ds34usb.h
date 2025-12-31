@@ -5,8 +5,9 @@
 
 #include <ds34common.h>
 
-#define DS3 0
-#define DS4 1
+#define DS3  0
+#define DS4  1
+#define F710 2
 
 #define MAX_BUFFER_SIZE 64 // Size of general purpose data buffer
 

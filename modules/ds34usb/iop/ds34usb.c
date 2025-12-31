@@ -92,6 +92,9 @@ int usb_probe(int devId)
     if (device->idVendor == DS34_VID && (device->idProduct == DS3_PID || device->idProduct == DS4_PID || device->idProduct == DS4_PID_SLIM))
         return 1;
 
+    if (device->idVendor == F710_DINPUT_VID && device->idProduct == F710_DINPUT_PID)
+        return 1;
+
     return 0;
 }
 
@@ -130,6 +133,9 @@ int usb_connect(int devId)
     if (device->idProduct == DS3_PID) {
         ds34pad[pad].type = DS3;
         epCount = interface->bNumEndpoints - 1;
+    } else if (device->idVendor == F710_DINPUT_VID && device->idProduct == F710_DINPUT_PID) {
+        ds34pad[pad].type = F710;
+        epCount = interface->bNumEndpoints;
     } else {
         ds34pad[pad].type = DS4;
         epCount = 20; // ds4 v2 returns interface->bNumEndpoints as 0
@@ -263,6 +269,79 @@ static void DS3USB_init(int pad)
     UsbControlTransfer(ds34pad[pad].controlEndp, REQ_USB_OUT, USB_REQ_SET_REPORT, (HID_USB_GET_REPORT_FEATURE << 8) | 0xF4, 0, 4, usb_buf, NULL, NULL);
 }
 
+static void translate_pad_f710_local(const struct f710report *in, struct ds2report *out)
+{
+    static const u8 dpad_mapping[] = {
+        (DS2ButtonUp),
+        (DS2ButtonUp | DS2ButtonRight),
+        (DS2ButtonRight),
+        (DS2ButtonDown | DS2ButtonRight),
+        (DS2ButtonDown),
+        (DS2ButtonDown | DS2ButtonLeft),
+        (DS2ButtonLeft),
+        (DS2ButtonUp | DS2ButtonLeft),
+        0,
+    };
+
+    u8 dpad = in->DpadButtons & 0x0F;
+    u8 face = (in->DpadButtons >> 4) & 0x0F;
+    u8 buttons = in->Buttons;
+    u16 pressed = 0;
+
+    if (dpad > DS4DpadDirectionReleased)
+        dpad = DS4DpadDirectionReleased;
+
+    pressed |= dpad_mapping[dpad];
+
+    if (face & 0x01)
+        pressed |= DS2ButtonSquare; // X
+    if (face & 0x02)
+        pressed |= DS2ButtonCross; // A
+    if (face & 0x04)
+        pressed |= DS2ButtonCircle; // B
+    if (face & 0x08)
+        pressed |= DS2ButtonTriangle; // Y
+
+    if (buttons & 0x01)
+        pressed |= DS2ButtonL1;
+    if (buttons & 0x02)
+        pressed |= DS2ButtonR1;
+    if (buttons & 0x04)
+        pressed |= DS2ButtonL2;
+    if (buttons & 0x08)
+        pressed |= DS2ButtonR2;
+    if (buttons & 0x10)
+        pressed |= DS2ButtonSelect;
+    if (buttons & 0x20)
+        pressed |= DS2ButtonStart;
+    if (buttons & 0x40)
+        pressed |= DS2ButtonL3;
+    if (buttons & 0x80)
+        pressed |= DS2ButtonR3;
+
+    out->nButtonState = ~pressed;
+
+    out->RightStickX = in->RightStickX;
+    out->RightStickY = in->RightStickY;
+    out->LeftStickX = in->LeftStickX;
+    out->LeftStickY = in->LeftStickY;
+
+    out->PressureRight = (pressed & DS2ButtonRight) ? 255 : 0;
+    out->PressureLeft = (pressed & DS2ButtonLeft) ? 255 : 0;
+    out->PressureUp = (pressed & DS2ButtonUp) ? 255 : 0;
+    out->PressureDown = (pressed & DS2ButtonDown) ? 255 : 0;
+
+    out->PressureTriangle = (pressed & DS2ButtonTriangle) ? 255 : 0;
+    out->PressureCircle = (pressed & DS2ButtonCircle) ? 255 : 0;
+    out->PressureCross = (pressed & DS2ButtonCross) ? 255 : 0;
+    out->PressureSquare = (pressed & DS2ButtonSquare) ? 255 : 0;
+
+    out->PressureL1 = (pressed & DS2ButtonL1) ? 255 : 0;
+    out->PressureR1 = (pressed & DS2ButtonR1) ? 255 : 0;
+    out->PressureL2 = (pressed & DS2ButtonL2) ? 255 : 0;
+    out->PressureR2 = (pressed & DS2ButtonR2) ? 255 : 0;
+}
+
 static void readReport(u8 *data, int pad)
 {
     if (data[0]) {
@@ -305,6 +384,11 @@ static void readReport(u8 *data, int pad)
             else
                 ds34pad[pad].oldled[3] = 0;
 
+        } else if (ds34pad[pad].type == F710) {
+            struct f710report *report;
+
+            report = (struct f710report *)data;
+            translate_pad_f710_local(report, &ds34pad[pad].ds2);
         } else if (ds34pad[pad].type == DS4) {
             struct ds4report *report;
             u8 up = 0, down = 0, left = 0, right = 0;
@@ -514,6 +598,9 @@ static int Rumble(u8 lrum, u8 rrum, int pad)
 void ds34usb_set_rumble(u8 lrum, u8 rrum, int port)
 {
     if (port >= MAX_PADS)
+        return;
+
+    if (ds34pad[port].type == F710)
         return;
 
     Rumble(lrum, rrum, port);
